@@ -24,6 +24,7 @@ export const IDE: React.FC = () => {
     scanProgress,
     toolResults,
     lastScanAt,
+    projectName,
     runScan,
   } = useApp();
 
@@ -114,6 +115,7 @@ export const IDE: React.FC = () => {
           files={files}
           activeFile={activeFile}
           findings={findings}
+          projectName={projectName}
           onSelectFile={setActiveFile}
           onCreateFile={() => setShowNewFile(true)}
           onDeleteFile={deleteFile}
@@ -130,6 +132,7 @@ export const IDE: React.FC = () => {
           scanDone={scanDone}
           onFileChange={updateFileContent}
           onSelectFile={setActiveFile}
+          onDeleteFile={deleteFile}
           onEditorMount={(editor) => {
             editorRef.current = editor;
           }}

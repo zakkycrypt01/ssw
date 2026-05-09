@@ -1,6 +1,6 @@
 import React from 'react';
 import Editor from '@monaco-editor/react';
-import { FileCode2 } from 'lucide-react';
+import { FileCode2, X } from 'lucide-react';
 
 interface FileContent {
   name: string;
@@ -16,6 +16,7 @@ interface EditorPanelProps {
   scanDone: boolean;
   onFileChange: (filename: string, content: string) => void;
   onSelectFile: (filename: string) => void;
+  onDeleteFile: (filename: string) => void;
   onEditorMount: (editor: any) => void;
 }
 
@@ -33,6 +34,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
   scanDone,
   onFileChange,
   onSelectFile,
+  onDeleteFile,
   onEditorMount,
 }) => {
   const currentFile = files[activeFile];
@@ -46,9 +48,31 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
             key={f.name}
             className={`editor-tab ${f.name === activeFile ? 'active' : ''}`}
             onClick={() => onSelectFile(f.name)}
+            title={f.name}
           >
-            <FileCode2 size={11} color={LANG_ICON_COLOR[f.language] ?? '#94a3b8'} />
-            {f.name}
+            <FileCode2 size={14} color={LANG_ICON_COLOR[f.language] ?? '#94a3b8'} />
+            <span>{f.name}</span>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDeleteFile(f.name);
+              }}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'inherit',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                padding: '2px',
+                marginLeft: '4px',
+                opacity: 0.6,
+              }}
+              title="Close tab"
+            >
+              <X size={12} />
+            </button>
+            {f.name === activeFile && <div className="editor-tab-dot" />}
           </div>
         ))}
       </div>

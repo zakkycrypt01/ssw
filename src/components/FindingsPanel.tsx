@@ -143,8 +143,7 @@ export const FindingsPanel: React.FC<FindingsPanelProps> = ({
           ))}
           {scanDone && (
             <div className="tool-summary-footer">
-              4 tools completed · {findings.length} total finding
-              {findings.length !== 1 ? 's' : ''}
+              cargo-audit · cargo-geiger · clippy · solana-fender · {findings.length} finding{findings.length !== 1 ? 's' : ''}
             </div>
           )}
         </div>

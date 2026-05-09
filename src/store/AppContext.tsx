@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
-import { analyzeCode, Finding } from '../lib/analyzer';
+import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
+import { Finding, analyzeCode } from '../lib/analyzer';
+import { scanProject } from '../lib/backendClient';
 
 interface FileContent {
   name: string;
@@ -19,124 +20,64 @@ interface AppContextType {
   updateFileContent: (filename: string, content: string) => void;
   createFile: (name: string) => void;
   deleteFile: (name: string) => void;
-  importFiles: (files: Record<string, FileContent>) => void;
+  importFiles: (files: Record<string, FileContent>, newProjectName?: string) => void;
   findings: Finding[];
-  scanStatus: 'idle' | 'running' | 'done';
+  scanStatus: 'idle' | 'running' | 'done' | 'error';
   scanProgress: number;
   toolResults: Record<string, ToolResult>;
   lastScanAt: Date | null;
+  projectName: string;
   runScan: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
 
-// Default starter project — user can replace/add files
-const DEFAULT_FILES: Record<string, FileContent> = {
-  'lib.rs': {
-    name: 'lib.rs',
-    language: 'rust',
-    content: `use anchor_lang::prelude::*;
-
-declare_id!("Fg6PaFpoGXkYsidMpWxTWqSBFTQXcRqHM2xHo7J8FJez");
-
-#[program]
-pub mod staking {
-    use super::*;
-
-    pub fn stake(ctx: Context<Stake>, amount: u64) -> Result<()> {
-        // TODO: add owner validation
-        ctx.accounts.vault.amount += amount;
-        let result = amount * 100; // unchecked arithmetic
-        Ok(())
-    }
-
-    pub fn unstake(ctx: Context<Unstake>, amount: u64) -> Result<()> {
-        ctx.accounts.vault.amount -= amount;
-        Ok(())
-    }
-}
-
-#[derive(Accounts)]
-pub struct Stake<'info> {
-    #[account(mut)]
-    pub vault: Account<'info, Vault>,
-    pub user: Signer<'info>,
-}
-
-#[derive(Accounts)]
-pub struct Unstake<'info> {
-    #[account(mut)]
-    pub vault: Account<'info, Vault>,
-    pub user: Signer<'info>,
-}
-
-#[account]
-pub struct Vault {
-    pub amount: u64,
-    pub owner: Pubkey,
-}
-`,
-  },
-  'state.rs': {
-    name: 'state.rs',
-    language: 'rust',
-    content: `use anchor_lang::prelude::*;
-
-#[account]
-pub struct Vault {
-    pub amount: u64,
-    pub owner: Pubkey,
-    pub bump: u8,
-}
-`,
-  },
-  'errors.rs': {
-    name: 'errors.rs',
-    language: 'rust',
-    content: `use anchor_lang::prelude::*;
-
-#[error_code]
-pub enum StakingError {
-    #[msg("Insufficient funds")]
-    InsufficientFunds,
-    #[msg("Unauthorized")]
-    Unauthorized,
-}
-`,
-  },
-  'Cargo.toml': {
-    name: 'Cargo.toml',
-    language: 'toml',
-    content: `[package]
-name = "staking-contract"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-anchor-lang = "0.29.0"
-curve25519-dalek = "3.2.0"
-solana-program = "1.16.0"
-`,
-  },
-};
+// Empty workspace — user imports their project files
+const DEFAULT_FILES: Record<string, FileContent> = {};
 
 interface AppProviderProps {
   children: ReactNode;
 }
 
 export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
-  const [files, setFiles] = useState<Record<string, FileContent>>(DEFAULT_FILES);
-  const [activeFile, setActiveFile] = useState<string>('lib.rs');
+  const [files, setFiles] = useState<Record<string, FileContent>>(() => {
+    try {
+      const saved = localStorage.getItem('ssw_files');
+      return saved ? JSON.parse(saved) : DEFAULT_FILES;
+    } catch {
+      return DEFAULT_FILES;
+    }
+  });
+
+  const [activeFile, setActiveFile] = useState<string>(() => {
+    return localStorage.getItem('ssw_activeFile') || '';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('ssw_files', JSON.stringify(files));
+  }, [files]);
+
+  useEffect(() => {
+    localStorage.setItem('ssw_activeFile', activeFile);
+  }, [activeFile]);
   const [findings, setFindings] = useState<Finding[]>([]);
-  const [scanStatus, setScanStatus] = useState<'idle' | 'running' | 'done'>('idle');
+  const [scanStatus, setScanStatus] = useState<'idle' | 'running' | 'done' | 'error'>('idle');
   const [scanProgress, setScanProgress] = useState<number>(0);
   const [toolResults, setToolResults] = useState<Record<string, ToolResult>>({
     'cargo-audit': { status: 'idle', message: '' },
     'cargo-geiger': { status: 'idle', message: '' },
     clippy: { status: 'idle', message: '' },
-    aderyn: { status: 'idle', message: '' },
+    'solana-fender': { status: 'idle', message: '' },
   });
   const [lastScanAt, setLastScanAt] = useState<Date | null>(null);
+
+  const [projectName, setProjectName] = useState<string>(() => {
+    return localStorage.getItem('ssw_projectName') || 'Untitled Solana Project';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('ssw_projectName', projectName);
+  }, [projectName]);
 
   const updateFileContent = useCallback((filename: string, content: string) => {
     setFiles((prev) => ({
@@ -172,89 +113,75 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     [files]
   );
 
-  const importFiles = useCallback((importedFiles: Record<string, FileContent>) => {
-    setFiles((prev) => ({ ...prev, ...importedFiles }));
+  const importFiles = useCallback((importedFiles: Record<string, FileContent>, newProjectName?: string) => {
+    setFiles(importedFiles);
+    if (newProjectName) {
+      setProjectName(newProjectName);
+    }
   }, []);
 
-  // Simulated multi-tool scan pipeline
+  // Backend Docker scanner pipeline
   const runScan = useCallback(async () => {
     if (scanStatus === 'running') return;
 
     setScanStatus('running');
-    setScanProgress(0);
+    setScanProgress(10);
     setFindings([]);
 
-    const reset: Record<string, ToolResult> = {
-      'cargo-audit': { status: 'running', message: 'Checking advisories…' },
-      'cargo-geiger': { status: 'idle', message: '' },
-      clippy: { status: 'idle', message: '' },
-      aderyn: { status: 'idle', message: '' },
-    };
-    setToolResults(reset);
+    setToolResults({
+      'cargo-audit': { status: 'running', message: 'Checking dependencies…' },
+      'cargo-geiger': { status: 'running', message: 'Scanning for unsafe code…' },
+      clippy: { status: 'running', message: 'Linting…' },
+      'solana-fender': { status: 'running', message: 'Running Solana SAST…' },
+    });
 
-    // Analyze all file contents right now
-    const allFindings: Finding[] = [];
-    for (const [, file] of Object.entries(files)) {
-      const fileFindings = analyzeCode(file.content, file.name);
-      allFindings.push(...fileFindings);
+    const scanPromise = scanProject(projectName, files);
+
+    let allFindings: Finding[] = [];
+    try {
+      setScanProgress(50);
+      const result = await scanPromise;
+      allFindings = result.findings;
+    } catch (error) {
+      console.error("Docker backend scan failed:", error);
+      const errMsg = error instanceof Error ? error.message : 'Backend scan failed';
+      setToolResults({
+        'cargo-audit': { status: 'done', message: 'Failed' },
+        'cargo-geiger': { status: 'done', message: 'Failed' },
+        clippy: { status: 'done', message: 'Failed' },
+        'solana-fender': { status: 'done', message: errMsg },
+      });
+      setScanProgress(100);
+      setScanStatus('error');
+      setLastScanAt(new Date());
+      return;
     }
 
-    const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    setScanProgress(100);
 
-    // Tool 1 — cargo-audit (dep checks)
-    await delay(900);
-    setScanProgress(25);
     const auditFindings = allFindings.filter((f) => f.tool === 'cargo-audit');
-    setToolResults((prev) => ({
-      ...prev,
+    const geigerFindings = allFindings.filter((f) => f.tool === 'cargo-geiger');
+    const clippyFindings = allFindings.filter((f) => f.tool === 'clippy');
+    const fenderFindings = allFindings.filter((f) => f.tool === 'solana-fender');
+
+    setToolResults({
       'cargo-audit': {
         status: 'done',
-        message:
-          auditFindings.length > 0
-            ? `${auditFindings.length} advisor${auditFindings.length > 1 ? 'ies' : 'y'}`
-            : 'Clean',
+        message: auditFindings.length > 0 ? `${auditFindings.length} advisor${auditFindings.length > 1 ? 'ies' : 'y'}` : 'Clean',
       },
-      'cargo-geiger': { status: 'running', message: 'Scanning unsafe blocks…' },
-    }));
-
-    // Tool 2 — cargo-geiger
-    await delay(900);
-    setScanProgress(50);
-    const geigerFindings = allFindings.filter((f) => f.tool === 'cargo-geiger');
-    setToolResults((prev) => ({
-      ...prev,
       'cargo-geiger': {
         status: 'done',
-        message:
-          geigerFindings.length > 0 ? `${geigerFindings.length} unsafe block(s)` : '0 unsafe',
+        message: geigerFindings.length > 0 ? `${geigerFindings.length} unsafe block(s)` : '0 unsafe',
       },
-      clippy: { status: 'running', message: 'Linting…' },
-    }));
-
-    // Tool 3 — Clippy
-    await delay(900);
-    setScanProgress(75);
-    const clippyFindings = allFindings.filter((f) => f.tool === 'clippy');
-    setToolResults((prev) => ({
-      ...prev,
       clippy: {
         status: 'done',
         message: clippyFindings.length > 0 ? `${clippyFindings.length} lint(s)` : 'Clean',
       },
-      aderyn: { status: 'running', message: 'Running SAST…' },
-    }));
-
-    // Tool 4 — Aderyn SAST
-    await delay(900);
-    setScanProgress(100);
-    const aderynFindings = allFindings.filter((f) => f.tool === 'aderyn');
-    setToolResults((prev) => ({
-      ...prev,
-      aderyn: {
+      'solana-fender': {
         status: 'done',
-        message: aderynFindings.length > 0 ? `${aderynFindings.length} issue(s)` : 'Clean',
+        message: fenderFindings.length > 0 ? `${fenderFindings.length} issue(s)` : 'Clean',
       },
-    }));
+    });
 
     setFindings(allFindings);
     setScanStatus('done');
@@ -274,6 +201,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     scanProgress,
     toolResults,
     lastScanAt,
+    projectName,
     runScan,
   };
 

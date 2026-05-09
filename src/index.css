@@ -472,104 +472,245 @@ input {
   overflow: hidden;
 }
 
-.ide-sidebar {
+/* ── VS Code-style file explorer sidebar ─────────────────────────────────── */
+.vsc-sidebar {
   border-right: 1px solid var(--border-1);
-  background: linear-gradient(180deg, rgba(11, 16, 24, 0.95), rgba(15, 22, 32, 0.95));
-  padding: 12px 0;
-  overflow-y: auto;
+  background: #141c27;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  user-select: none;
 }
 
-.sidebar-section {
-  padding: 8px 14px;
-  font-size: 11px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--text-3);
-  font-weight: 600;
-}
-
-.file-item {
-  margin: 3px 8px;
-  border-radius: 9px;
-  border: 1px solid transparent;
+.vsc-sidebar-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 9px 10px;
-  font-size: 12px;
-  color: var(--text-2);
-  cursor: pointer;
+  padding: 6px 8px 6px 12px;
+  border-bottom: 1px solid var(--border-1);
+  background: #111822;
+  flex-shrink: 0;
+  gap: 2px;
 }
 
-.file-item:hover {
-  background: rgba(32, 46, 66, 0.68);
-  border-color: rgba(70, 99, 136, 0.35);
+.vsc-header-title {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--text-3);
+  font-weight: 600;
+  flex: 1;
+}
+
+.vsc-header-actions {
+  display: flex;
+  gap: 2px;
+}
+
+.vsc-icon-btn {
+  background: none;
+  border: none;
+  color: var(--text-3);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  transition: color 0.12s, background 0.12s;
+}
+
+.vsc-icon-btn:hover {
+  color: var(--text-1);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.vsc-icon-btn:disabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+}
+
+.vsc-section-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border-1);
+  background: #111822;
+  flex-shrink: 0;
+}
+
+.vsc-section-title {
+  font-size: 11px;
+  letter-spacing: 0.07em;
+  color: var(--text-2);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vsc-tree {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-top: 4px;
+}
+
+.vsc-tree-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  font-size: 13px;
+  color: var(--text-2);
+  cursor: pointer;
+  white-space: nowrap;
+  position: relative;
+  border-left: 2px solid transparent;
+  transition: background 0.1s;
+  padding-right: 4px;
+}
+
+.vsc-tree-row:hover {
+  background: rgba(255, 255, 255, 0.06);
   color: var(--text-1);
 }
 
-.file-item.active {
-  color: var(--accent);
-  border-color: rgba(198, 255, 46, 0.35);
-  background: rgba(198, 255, 46, 0.08);
+.vsc-tree-row.vsc-file.active {
+  background: rgba(9, 105, 218, 0.22);
+  color: var(--text-1);
+  border-left-color: #58bcff;
 }
 
-.file-badge-dot {
+.vsc-tree-row .vsc-chevron {
+  display: flex;
+  align-items: center;
+  color: var(--text-3);
+  flex-shrink: 0;
+  width: 16px;
+}
+
+.vsc-tree-row .vsc-folder-icon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.vsc-tree-row .vsc-file-icon {
+  display: flex;
+  align-items: center;
+  width: 18px;
+  flex-shrink: 0;
+}
+
+.vsc-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.vsc-finding-dot {
   width: 7px;
   height: 7px;
   border-radius: 50%;
   background: var(--high);
-  box-shadow: 0 0 10px rgba(255, 142, 69, 0.8);
+  box-shadow: 0 0 6px rgba(255, 142, 69, 0.8);
+  flex-shrink: 0;
 }
 
-.file-delete-btn {
-  color: #89a1be;
+.vsc-delete-btn {
+  background: none;
+  border: none;
+  color: var(--text-3);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  padding: 2px;
+  border-radius: 3px;
+  opacity: 0;
+  flex-shrink: 0;
+  transition: opacity 0.1s, color 0.1s;
 }
 
-.file-delete-btn:hover {
-  color: #d8e5f8;
+.vsc-tree-row:hover .vsc-delete-btn {
+  opacity: 1;
 }
 
-.file-action {
-  color: #9ec0ef;
+.vsc-delete-btn:hover {
+  color: #ff7b7b;
+  background: rgba(255, 60, 60, 0.12);
 }
 
-.sidebar-scan-summary {
-  margin: 14px 10px 0;
+.vsc-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 32px 16px;
+  gap: 10px;
+  color: var(--text-3);
+  font-size: 13px;
+  text-align: center;
+}
+
+.vsc-empty p {
+  color: var(--text-3);
+}
+
+.vsc-open-btn {
+  background: rgba(9, 105, 218, 0.22);
+  border: 1px solid rgba(88, 188, 255, 0.35);
+  color: #58bcff;
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.vsc-open-btn:hover {
+  background: rgba(9, 105, 218, 0.4);
+}
+
+.vsc-scan-summary {
+  margin: 10px 8px;
   border: 1px solid var(--border-1);
   background: rgba(13, 21, 31, 0.65);
-  border-radius: 10px;
-  padding: 10px;
+  border-radius: 8px;
+  padding: 8px 10px;
+  flex-shrink: 0;
 }
 
-.scan-summary-title {
+.vsc-scan-summary-title {
   display: flex;
   align-items: center;
   gap: 6px;
-  color: var(--text-2);
-  font-size: 11px;
+  color: var(--text-3);
+  font-size: 10px;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  margin-bottom: 8px;
+  letter-spacing: 0.1em;
+  margin-bottom: 6px;
 }
 
-.scan-summary-row {
+.vsc-scan-summary-row {
   display: flex;
   align-items: center;
   gap: 7px;
-  padding: 4px 0;
-  color: var(--text-2);
+  padding: 3px 0;
   font-size: 12px;
+  color: var(--text-2);
 }
 
-.scan-summary-label {
+.vsc-scan-summary-label {
   text-transform: capitalize;
+  flex: 1;
 }
 
-.scan-summary-count {
-  margin-left: auto;
+.vsc-scan-summary-count {
   font-family: var(--font-mono);
+  font-size: 11px;
 }
 
+/* Keep old file-item/sidebar-section for any remaining legacy uses */
 .sev-dot {
   width: 8px;
   height: 8px;
@@ -597,30 +738,47 @@ input {
 
 .editor-tabs {
   display: flex;
-  gap: 6px;
-  padding: 10px;
+  gap: 0;
+  padding: 0;
   border-bottom: 1px solid var(--border-1);
   overflow-x: auto;
+  background: var(--bg-2);
 }
 
 .editor-tab {
-  padding: 8px 10px;
-  border-radius: 8px;
-  border: 1px solid transparent;
+  padding: 10px 12px;
+  border-radius: 0;
+  border: none;
+  border-bottom: 2px solid transparent;
   font-size: 12px;
   color: var(--text-3);
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   cursor: pointer;
   white-space: nowrap;
+  position: relative;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
 }
 
-.editor-tab:hover,
+.editor-tab:hover {
+  color: var(--text-1);
+  background: rgba(255, 255, 255, 0.05);
+}
+
 .editor-tab.active {
   color: var(--text-1);
-  background: rgba(41, 57, 79, 0.48);
-  border-color: rgba(98, 132, 173, 0.38);
+  border-bottom-color: #007acc;
+  background: var(--bg-1);
+}
+
+.editor-tab-dot {
+  width: 6px;
+  height: 6px;
+  background: var(--accent);
+  border-radius: 50%;
+  margin-left: auto;
 }
 
 .editor-empty {

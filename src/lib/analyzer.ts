@@ -6,7 +6,7 @@
 
 export interface Finding {
   id: string;
-  tool: 'aderyn' | 'cargo-audit' | 'clippy' | 'cargo-geiger';
+  tool: 'solana-fender' | 'cargo-audit' | 'clippy' | 'cargo-geiger';
   severity: 'critical' | 'high' | 'medium' | 'low' | 'info';
   title: string;
   description: string;
@@ -31,7 +31,7 @@ let findingIdCounter = 0;
 const nextId = (tool: string): string => {
   findingIdCounter++;
   const prefixes: Record<string, string> = {
-    aderyn: 'SSW',
+    'solana-fender': 'SWC',
     'cargo-audit': 'AUD',
     clippy: 'CLY',
     'cargo-geiger': 'GEI',
