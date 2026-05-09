@@ -72,7 +72,7 @@ export const IDE: React.FC = () => {
     generatePDF(sorted, 'my-project', toolResults);
   };
 
-  const projectName = Object.keys(files)[0]?.replace('.rs', '') ?? 'project';
+
 
   return (
     <div className="ide-root">

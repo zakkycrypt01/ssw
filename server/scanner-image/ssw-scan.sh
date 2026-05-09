@@ -3,12 +3,14 @@ set -u
 
 mkdir -p /out
 
+# Wraps a tool: captures stdout/stderr, writes exit code to /out/<name>.status
+# TOOL_TIMEOUT_SECONDS defaults to 300s (5 min) — Anchor compilation takes time
 run_tool() {
   local name="$1"
   shift
 
   set +e
-  timeout "${TOOL_TIMEOUT_SECONDS:-110}" "$@" >"/out/${name}.stdout" 2>"/out/${name}.stderr"
+  timeout "${TOOL_TIMEOUT_SECONDS:-300}" "$@" >"/out/${name}.stdout" 2>"/out/${name}.stderr"
   local status=$?
   set -e
 
@@ -27,34 +29,39 @@ if [ ! -f Cargo.toml ]; then
 fi
 
 # ── cargo-audit ────────────────────────────────────────────────────────────────
-# --no-fetch uses the pre-baked advisory-db, no network needed
+# Runs against the advisory-db baked into the image; --no-fetch keeps it offline
 run_tool cargo-audit \
   cargo audit --json \
   --no-fetch \
   --db /usr/local/rustsec/advisory-db
 
-# ── Fetch missing deps using pre-baked registry ────────────────────────────────
-cargo fetch --offline 2>/out/fetch.stderr || true
+# ── Fetch/update lockfile (online, network is now enabled) ─────────────────────
+# This resolves any missing deps before the tools that need compilation run
+cargo generate-lockfile 2>/out/lockfile.stderr || true
 
 # ── cargo-geiger ───────────────────────────────────────────────────────────────
+# Scans for unsafe {} blocks in the dependency tree.
+# No --offline: needs to download deps on first run (cached to the volume)
 run_tool cargo-geiger \
-  cargo geiger --offline --all-features --output-format Json
+  cargo geiger --all-features --output-format Json
 
 # ── clippy ─────────────────────────────────────────────────────────────────────
+# Lints Anchor programs; warns on arithmetic, unwrap, panic, and expect usage.
+# No --offline for same reason as geiger.
 run_tool clippy \
-  cargo clippy --offline \
+  cargo clippy \
   --message-format=json \
   --all-targets \
   --all-features \
   -- \
-  -W clippy::integer_arithmetic \
   -W clippy::arithmetic_side_effects \
   -W clippy::unwrap_used \
   -W clippy::expect_used \
   -W clippy::panic
 
-# ── solana-fender ─────────────────────────────────────────────────────────────
-# Runs Solana/Anchor-specific SAST checks (owner check, signer check, CPI, etc.)
+# ── solana-fender ──────────────────────────────────────────────────────────────
+# Runs Solana/Anchor-specific SAST checks:
+#   owner_check, signer_check, CPI safety, PDA bump canonicalization, etc.
 run_tool solana-fender \
   solana_fender --program /scan
 

@@ -16,7 +16,7 @@ interface FindingsPanelProps {
   sortedFindings: Finding[];
   summary: Record<string, number>;
   scanDone: boolean;
-  scanStatus: 'idle' | 'running' | 'done';
+  scanStatus: 'idle' | 'running' | 'done' | 'error';
   findings: Finding[];
   selectedFinding: Finding | null;
   onFindingClick: (finding: Finding) => void;

@@ -105,7 +105,7 @@ async function runDockerScan({ projectName, files, startedAt, scanId }) {
     const toolOutputs = await readOutputJson(outputDir);
 
     // ── Per-tool diagnostic logs ──────────────────────────────────────────────
-    const TOOLS = ['cargo-audit', 'cargo-geiger', 'clippy', 'aderyn'];
+    const TOOLS = ['cargo-audit', 'cargo-geiger', 'clippy', 'solana-fender'];
     for (const tool of TOOLS) {
       const t = toolOutputs[tool] || {};
       const exitCode = t.status;
@@ -115,20 +115,20 @@ async function runDockerScan({ projectName, files, startedAt, scanId }) {
       console.log(`\n┌─── [${tool}] exit code: ${exitCode} ${'─'.repeat(Math.max(0, 48 - tool.length))}`);
 
       if (stderr) {
-        console.log(`│ STDERR:\n${stderr.split('\n').map(l => `│  ${l}`).join('\n')}`);
+        const preview = stderr.length > 3000 ? stderr.slice(0, 3000) + '\n… (truncated)' : stderr;
+        console.log(`│ STDERR:\n${preview.split('\n').map(l => `│  ${l}`).join('\n')}`);
       }
-      if (stdout && tool !== 'aderyn') {
-        // Aderyn stdout is the full JSON report — skip printing it raw
+      if (stdout && tool !== 'solana-fender') {
         const preview = stdout.length > 2000 ? stdout.slice(0, 2000) + '\n… (truncated)' : stdout;
         console.log(`│ STDOUT:\n${preview.split('\n').map(l => `│  ${l}`).join('\n')}`);
       }
-      if (tool === 'aderyn' && stdout) {
+      if (tool === 'solana-fender' && stdout) {
         try {
           const parsed = JSON.parse(stdout);
           const count = (parsed.issues || parsed.findings || parsed.detectors || []).length;
-          console.log(`│ Aderyn report parsed OK — ${count} issue(s) found`);
+          console.log(`│ solana-fender report parsed OK — ${count} issue(s) found`);
         } catch {
-          console.log(`│ Aderyn report could not be parsed as JSON`);
+          console.log(`│ solana-fender report could not be parsed as JSON`);
           console.log(`│ Raw preview: ${stdout.slice(0, 500)}`);
         }
       }
